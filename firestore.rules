@@ -1,0 +1,110 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function getExistingUser(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data;
+    }
+
+    function isAdmin() {
+      return isEmailVerified() && getExistingUser(request.auth.uid).role == 'admin';
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Users ---
+    function isDesignatedAdmin() {
+      return isEmailVerified() && request.auth.token.email == 'facecuongle@gmail.com';
+    }
+
+    match /users/{userId} {
+      function isValidUser(data) {
+        return data.keys().hasAll(['uid', 'email', 'role']) &&
+               data.uid is string && data.uid == request.auth.uid &&
+               data.email is string && data.email.size() <= 200 &&
+               data.role in ['admin', 'employee'] &&
+               (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 100)) &&
+               (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 500));
+      }
+
+      allow get: if isSignedIn();
+      allow list: if isAdmin();
+      
+      allow create: if isEmailVerified() && isValidUser(incoming()) && 
+                    (incoming().role == 'employee' || isDesignatedAdmin());
+      
+      allow update: if isEmailVerified() && (
+        (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'lastSeen', 'currentLocation', 'isOnline', 'status'])) ||
+        (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'status']))
+      );
+    }
+
+    // --- Tasks ---
+    match /tasks/{taskId} {
+      function isValidTask(data) {
+        return data.keys().hasAll(['title', 'assignedTo', 'status']) &&
+               data.title is string && data.title.size() <= 200 &&
+               data.assignedTo is string && 
+               data.status in ['pending', 'in-progress', 'completed'] &&
+               (!('priority' in data) || data.priority in ['low', 'medium', 'high']);
+      }
+
+      allow get: if isEmailVerified() && (isAdmin() || resource.data.assignedTo == request.auth.uid);
+      allow list: if isEmailVerified() && (
+        isAdmin() || 
+        (resource.data.assignedTo == request.auth.uid)
+      );
+
+      allow create: if isAdmin() && isValidTask(incoming()) && isValidId(taskId);
+      
+      allow update: if isEmailVerified() && (
+        (isAdmin() && isValidTask(incoming())) ||
+        (existing().assignedTo == request.auth.uid && 
+         incoming().diff(existing()).affectedKeys().hasOnly(['status']) &&
+         incoming().status in ['in-progress', 'completed'])
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    // --- Locations ---
+    match /locations/{locationId} {
+      function isValidLocation(data) {
+        return data.keys().hasAll(['userId', 'lat', 'lng', 'timestamp']) &&
+               data.userId == request.auth.uid &&
+               data.lat is number && data.lng is number &&
+               (data.timestamp is string || data.timestamp is timestamp);
+      }
+
+      allow read: if isEmailVerified() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow create: if isEmailVerified() && isValidLocation(incoming()) && isValidId(locationId);
+    }
+  }
+}

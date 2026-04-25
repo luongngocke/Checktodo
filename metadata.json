@@ -1,0 +1,6 @@
+{
+  "name": "SEO Field Manager",
+  "description": "Hệ thống quản lý nhân viên SEO thị trường với định vị GPS và nhắc nhở công việc.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["Real-time Tracking", "Work Reminders"]
+}
