@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { collection, onSnapshot, query, where, orderBy, doc, updateDoc, addDoc } from 'firebase/firestore';
 import { db, handleFirestoreError } from '../lib/firebase';
 import { UserProfile, Task, TaskStatus, OperationType, TaskPriority } from '../types';
@@ -13,8 +13,47 @@ interface EmployeeViewProps {
 
 export default function EmployeeView({ profile }: EmployeeViewProps) {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [isTracking, setIsTracking] = useState(true);
+  const [isTracking, setIsTracking] = useState(() => {
+    const saved = localStorage.getItem('isTracking');
+    return saved === null ? true : saved === 'true';
+  });
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [lastLoggedLocation, setLastLoggedLocation] = useState<{lat: number, lng: number, time: number} | null>(null);
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'error'>('idle');
+  const wakeLockRef = useRef<any>(null);
+
+  useEffect(() => {
+    // Attempt to request Wake Lock
+    const requestWakeLock = async () => {
+      if ('wakeLock' in navigator) {
+        try {
+          wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
+        } catch (err) {
+          console.warn("Wake Lock failed:", err);
+        }
+      }
+    };
+
+    if (isTracking) {
+      requestWakeLock();
+    } else {
+      if (wakeLockRef.current) {
+        wakeLockRef.current.release();
+        wakeLockRef.current = null;
+      }
+    }
+
+    return () => {
+      if (wakeLockRef.current) {
+        wakeLockRef.current.release();
+        wakeLockRef.current = null;
+      }
+    };
+  }, [isTracking]);
+
+  useEffect(() => {
+    localStorage.setItem('isTracking', isTracking.toString());
+  }, [isTracking]);
 
   useEffect(() => {
     // Listen for my tasks
@@ -34,6 +73,7 @@ export default function EmployeeView({ profile }: EmployeeViewProps) {
         async (position) => {
           const { latitude, longitude } = position.coords;
           const userDocRef = doc(db, 'users', profile.uid);
+          const now = Date.now();
           const locationData = {
             lat: latitude,
             lng: longitude,
@@ -41,30 +81,55 @@ export default function EmployeeView({ profile }: EmployeeViewProps) {
           };
 
           try {
-            // Update user's current location
+            setSyncStatus('syncing');
+            // Update user's current location (real-time for admin)
             await updateDoc(userDocRef, {
               currentLocation: locationData,
               isOnline: true,
               lastSeen: new Date().toISOString()
             });
 
-            // Log to location history
-            await addDoc(collection(db, 'locations'), {
-              userId: profile.uid,
-              ...locationData,
-              // Note: We use the manual timestamp to match security rules exactly
-              timestamp: locationData.timestamp
-            });
+            // Log to history ONLY IF:
+            // 1. First time
+            // 2. Moved significant distance (approx 10m)
+            // 3. 5 minutes passed
+            let shouldLog = false;
+            if (!lastLoggedLocation) {
+              shouldLog = true;
+            } else {
+              const timeDiff = now - lastLoggedLocation.time;
+              const distDiff = Math.sqrt(
+                Math.pow(latitude - lastLoggedLocation.lat, 2) + 
+                Math.pow(longitude - lastLoggedLocation.lng, 2)
+              );
+              
+              // Approx 0.0001 degrees is ~11 meters
+              if (distDiff > 0.0001 || timeDiff > 5 * 60 * 1000) {
+                shouldLog = true;
+              }
+            }
+
+            if (shouldLog) {
+              await addDoc(collection(db, 'locations'), {
+                userId: profile.uid,
+                ...locationData,
+                timestamp: locationData.timestamp
+              });
+              setLastLoggedLocation({ lat: latitude, lng: longitude, time: now });
+            }
             setLocationError(null);
+            setSyncStatus('idle');
           } catch (error) {
             console.error("Location update failed", error);
+            setSyncStatus('error');
           }
         },
         (error) => {
           setLocationError(error.message);
-          setIsTracking(false);
+          // Don't auto-stop on minor errors
+          if (error.code === 1) setIsTracking(false); 
         },
-        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
     }
 
@@ -72,7 +137,7 @@ export default function EmployeeView({ profile }: EmployeeViewProps) {
       unsubTasks();
       if (watchId) navigator.geolocation.clearWatch(watchId);
     };
-  }, [profile.uid, isTracking]);
+  }, [profile.uid, isTracking, lastLoggedLocation]);
 
   const updateTaskStatus = async (taskId: string, newStatus: TaskStatus) => {
     try {
@@ -101,15 +166,22 @@ export default function EmployeeView({ profile }: EmployeeViewProps) {
           >
             <div className="flex items-center gap-5">
               <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg transition-all duration-500 ${isTracking ? 'bg-blue-600 shadow-blue-100' : 'bg-slate-200 shadow-slate-100'}`}>
-                <Navigation2 className={`text-white w-7 h-7 ${isTracking ? 'animate-pulse' : ''}`} />
+                <Navigation2 className={`text-white w-7 h-7 ${isTracking && syncStatus === 'syncing' ? 'animate-pulse' : ''}`} />
               </div>
               <div>
                 <h3 className="text-lg font-black text-slate-900 leading-tight tracking-tight">
                   {isTracking ? 'Đang trực tuyến' : 'Đã dừng trực'}
                 </h3>
-                <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mt-1">
-                  {isTracking ? 'Hệ thống đang ghi nhận vị trí' : 'Vui lòng bắt đầu để nhận việc'}
-                </p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <div className={`w-1.5 h-1.5 rounded-full ${
+                    isTracking ? (syncStatus === 'syncing' ? 'bg-blue-500 animate-ping' : 'bg-green-500') : 'bg-slate-300'
+                  }`} />
+                  <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest leading-none">
+                    {isTracking 
+                      ? (syncStatus === 'syncing' ? 'Đang cập nhật...' : `Lần cuối: ${lastLoggedLocation ? format(lastLoggedLocation.time, 'HH:mm:ss') : 'Vừa xong'}`) 
+                      : 'Offline'}
+                  </p>
+                </div>
               </div>
             </div>
 
