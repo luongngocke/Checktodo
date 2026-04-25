@@ -4,7 +4,7 @@ import { db, handleFirestoreError, logout } from '../lib/firebase';
 import { UserProfile, UserRole, Task, TaskStatus, TaskPriority, LocationHistory, OperationType } from '../types';
 import Navbar from './Navbar';
 import { motion, AnimatePresence } from 'motion/react';
-import { LogOut, Map as MapIcon, Users, ClipboardList, Plus, Search, Calendar, Clock, Navigation, AlertCircle, LayoutDashboard, Bell, FileText, Settings, User as UserIcon, History as HistoryIcon, ChevronRight } from 'lucide-react';
+import { LogOut, Map as MapIcon, Users, ClipboardList, Plus, Search, Calendar, Clock, Navigation, AlertCircle, LayoutDashboard, Bell, FileText, Settings, User as UserIcon, History as HistoryIcon, ChevronRight, Menu, X } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import { format } from 'date-fns';
@@ -31,6 +31,7 @@ export default function AdminDashboard({ profile }: AdminDashboardProps) {
   const [historyEmployeeId, setHistoryEmployeeId] = useState<string>('');
   const [historyData, setHistoryData] = useState<LocationHistory[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     // Listen for all employees
@@ -95,8 +96,8 @@ export default function AdminDashboard({ profile }: AdminDashboardProps) {
 
   return (
     <div className="flex h-screen bg-slate-50 font-sans overflow-hidden">
-      {/* Sidebar - Design: Professional Polish */}
-      <aside className="w-64 bg-slate-900 text-white flex flex-col shrink-0">
+      {/* Sidebar - Desktop Only */}
+      <aside className="hidden lg:flex w-64 bg-slate-900 text-white flex-col shrink-0">
         <div className="p-6">
           <h1 className="text-xl font-bold tracking-tight flex items-center gap-2">
             <span className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-[10px] font-black">SEO</span>
@@ -127,19 +128,7 @@ export default function AdminDashboard({ profile }: AdminDashboardProps) {
             active={activeTab === 'history'} 
             onClick={() => setActiveTab('history')} 
             icon={<HistoryIcon className="w-5 h-5" />} 
-            label="Lịch sử đường đi" 
-          />
-          <SidebarLink 
-            active={false} 
-            onClick={() => {}} 
-            icon={<Bell className="w-5 h-5" />} 
-            label="Nhắc nhở" 
-          />
-          <SidebarLink 
-            active={false} 
-            onClick={() => {}} 
-            icon={<FileText className="w-5 h-5" />} 
-            label="Báo cáo" 
+            label="Lịch sử" 
           />
         </nav>
 
@@ -166,51 +155,61 @@ export default function AdminDashboard({ profile }: AdminDashboardProps) {
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm shrink-0 z-10">
-          <h2 className="text-lg font-semibold text-slate-800">
+      <main className="flex-1 flex flex-col overflow-hidden pb-16 lg:pb-0">
+        {/* Header - Optimized for Mobile */}
+        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 lg:px-8 shadow-sm shrink-0 z-10">
+          <div className="flex items-center gap-3 lg:hidden">
+             <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-[10px] font-black text-white">SEO</div>
+             <h1 className="text-lg font-bold tracking-tight text-slate-900 whitespace-nowrap">TrackMaster</h1>
+          </div>
+          
+          <h2 className="hidden lg:block text-lg font-semibold text-slate-800">
             {activeTab === 'map' && 'Thời gian thực (TP. HCM)'}
             {activeTab === 'staff' && 'Quản lý Đội ngũ'}
             {activeTab === 'tasks' && 'Tiến độ Công việc'}
             {activeTab === 'history' && 'Lịch sử di chuyển'}
           </h2>
-          <div className="flex gap-3">
-             {activeTab === 'tasks' && (
-              <button 
-                onClick={() => setIsTaskModalOpen(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold shadow-md shadow-blue-100 hover:bg-blue-700 transition-all flex items-center gap-2"
-              >
-                <Plus className="w-4 h-4" />
-                Giao việc mới
-              </button>
-             )}
-             <button className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-semibold border border-blue-100 hover:bg-blue-100 transition-colors">
-               Gửi thông báo
+
+          <div className="flex items-center gap-2">
+             <button 
+                onClick={() => logout()}
+                className="lg:hidden p-2 text-slate-400 hover:text-red-500 transition-colors"
+             >
+                <LogOut className="w-5 h-5" />
              </button>
+             {activeTab === 'tasks' && (
+                <button 
+                  onClick={() => setIsTaskModalOpen(true)}
+                  className="px-3 lg:px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold shadow-md shadow-blue-100 hover:bg-blue-700 transition-all flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span className="hidden sm:inline">Giao việc mới</span>
+                  <span className="sm:hidden">Thêm</span>
+                </button>
+             )}
           </div>
         </header>
 
         {/* Content Area */}
-        <div className="flex-1 bg-slate-50 overflow-hidden">
+        <div className="flex-1 bg-slate-50 overflow-hidden relative">
           {activeTab === 'map' && (
-            <div className="h-full flex flex-col p-6 gap-6">
-              {/* Top Stats */}
-              <div className="grid grid-cols-3 gap-6 shrink-0">
-                <StatCard label="Tổng nhân viên" value={employees.length} />
-                <StatCard label="Đang hoạt động" value={employees.filter(e => e.isOnline).length} status="online" />
-                <StatCard label="Ngoại tuyến" value={employees.filter(e => !e.isOnline).length} />
+            <div className="h-full flex flex-col p-4 lg:p-6 gap-4 lg:gap-6">
+              {/* Top Stats - Responsive Grid */}
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-6 shrink-0">
+                <StatCard label="Nhân viên" value={employees.length} />
+                <StatCard label="Online" value={employees.filter(e => e.isOnline).length} status="online" />
+                <StatCard className="hidden lg:block" label="Offline" value={employees.filter(e => !e.isOnline).length} />
               </div>
 
-              {/* Map Layout */}
-              <div className="flex-1 grid grid-cols-12 gap-6 overflow-hidden min-h-0">
-                <div className="col-span-12 lg:col-span-8 relative rounded-3xl border-4 border-white shadow-xl shadow-slate-200 overflow-hidden bg-slate-200">
+              {/* Map Layout - Responsive */}
+              <div className="flex-1 grid grid-cols-12 gap-4 lg:gap-6 overflow-hidden min-h-0">
+                <div className="col-span-12 lg:col-span-8 relative rounded-2xl lg:rounded-3xl border-4 border-white shadow-xl shadow-slate-200 overflow-hidden bg-slate-200">
                   <StaffMap employees={employees} />
                   
-                  {/* Map HUD */}
-                  <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm p-4 rounded-2xl shadow-lg border border-slate-100 text-xs z-[1000]">
-                    <p className="font-bold text-slate-900 mb-1">Khu vực: TP. Hồ Chí Minh</p>
-                    <p className="text-slate-500 font-medium">Cập nhật: Mới nhất</p>
+                  {/* Map HUD - Hidden or repositioned on mobile */}
+                  <div className="absolute top-3 right-3 lg:top-4 lg:right-4 bg-white/90 backdrop-blur-sm p-2 lg:p-4 rounded-xl lg:rounded-2xl shadow-lg border border-slate-100 text-[10px] lg:text-xs z-[1000]">
+                    <p className="font-bold text-slate-900 mb-0.5">TP. Hồ Chí Minh</p>
+                    <p className="text-slate-500 font-medium hidden sm:block">Cập nhật: Mới nhất</p>
                   </div>
                 </div>
 
@@ -244,16 +243,21 @@ export default function AdminDashboard({ profile }: AdminDashboardProps) {
           )}
 
           {activeTab === 'staff' && (
-            <div className="p-8 overflow-y-auto">
+            <div className="p-4 lg:p-8 overflow-y-auto h-full pb-10">
               <div className="max-w-6xl mx-auto">
-                <div className="flex items-center justify-between mb-8">
-                  <h1 className="text-3xl font-black text-slate-900 tracking-tight">Nhân viên SEO</h1>
-                  <span className="px-4 py-1.5 bg-blue-100 text-blue-700 rounded-full text-sm font-bold">
-                    Tổng số: {employees.length}
-                  </span>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 lg:mb-8">
+                  <h1 className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">Nhân viên SEO</h1>
+                  <div className="flex items-center gap-2">
+                    <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs lg:text-sm font-bold">
+                      Tổng số: {employees.length}
+                    </span>
+                    <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs lg:text-sm font-bold">
+                      Online: {employees.filter(e => e.isOnline).length}
+                    </span>
+                  </div>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
                   {employees.map(emp => (
                     <StaffCard key={emp.uid} employee={emp} />
                   ))}
@@ -263,27 +267,27 @@ export default function AdminDashboard({ profile }: AdminDashboardProps) {
           )}
 
           {activeTab === 'tasks' && (
-            <div className="p-8 overflow-y-auto flex-1">
+            <div className="p-4 lg:p-8 overflow-y-auto h-full pb-10">
               <div className="max-w-6xl mx-auto">
-                <div className="flex items-center justify-between mb-8">
-                  <h1 className="text-3xl font-black text-slate-900 tracking-tight">Quản lý công việc</h1>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 lg:mb-8">
+                  <h1 className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">Quản lý công việc</h1>
                   <button 
                     onClick={() => setIsTaskModalOpen(true)}
-                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-2xl font-bold transition-all shadow-lg shadow-blue-100"
+                    className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-blue-100"
                   >
                     <Plus className="w-5 h-5" />
                     Giao việc mới
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-1 gap-3 lg:gap-4">
                   {tasks.length === 0 ? (
-                    <div className="bg-white rounded-3xl p-12 text-center border-2 border-dashed border-slate-200">
-                      <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                        <ClipboardList className="text-slate-300 w-8 h-8" />
+                    <div className="bg-white rounded-2xl lg:rounded-3xl p-8 lg:p-12 text-center border-2 border-dashed border-slate-200">
+                      <div className="w-12 h-12 lg:w-16 lg:h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <ClipboardList className="text-slate-300 w-6 h-6 lg:w-8 lg:h-8" />
                       </div>
                       <h3 className="text-lg font-bold text-slate-900">Chưa có công việc nào</h3>
-                      <p className="text-slate-500 max-w-xs mx-auto mt-2">Bắt đầu giao việc cho nhân viên của bạn bằng nút phía trên.</p>
+                      <p className="text-slate-500 max-w-xs mx-auto mt-2 text-sm">Bắt đầu giao việc cho nhân viên của bạn bằng nút phía trên.</p>
                     </div>
                   ) : (
                     tasks.map(task => (
@@ -296,14 +300,41 @@ export default function AdminDashboard({ profile }: AdminDashboardProps) {
           )}
           
           {activeTab === 'history' && (
-            <div className="h-full flex overflow-hidden">
-              {/* Employee Selection Sidebar */}
-              <div className="w-80 border-r border-slate-200 bg-white flex flex-col shrink-0 overflow-hidden">
-                <div className="p-6 border-b border-slate-50">
-                  <h3 className="text-xl font-bold text-slate-800 mb-2">Xem lịch sử</h3>
-                  <p className="text-xs text-slate-500 font-medium">Chọn nhân viên để xem lại hành trình (100 điểm gần nhất)</p>
+            <div className="h-full flex flex-col lg:flex-row overflow-hidden">
+              {/* Employee Selection - Slider on mobile, Sidebar on Desktop */}
+              <div className="lg:w-80 border-b lg:border-b-0 lg:border-r border-slate-200 bg-white flex flex-col shrink-0 overflow-hidden">
+                <div className="p-4 lg:p-6 border-b border-slate-50">
+                  <h3 className="text-lg lg:text-xl font-bold text-slate-800 lg:mb-1">Xem lịch trình</h3>
+                  <p className="hidden lg:block text-xs text-slate-500 font-medium">Chọn nhân viên để xem lại hành trình</p>
                 </div>
-                <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                
+                {/* Mobile Horizontal Scroll for selection */}
+                <div className="lg:hidden flex overflow-x-auto p-4 gap-3 no-scrollbar">
+                  {employees.map(emp => (
+                    <button
+                      key={emp.uid}
+                      onClick={() => fetchHistory(emp.uid)}
+                      className={`flex flex-col items-center shrink-0 w-20 gap-1.5 transition-all`}
+                    >
+                      <div className={`relative p-0.5 rounded-xl border-2 transition-all ${historyEmployeeId === emp.uid ? 'border-blue-500' : 'border-transparent'}`}>
+                        {emp.photoURL ? (
+                          <img src={emp.photoURL} alt={emp.displayName} className="w-14 h-14 rounded-[10px] object-cover" />
+                        ) : (
+                          <div className="w-14 h-14 bg-slate-100 rounded-[10px] flex items-center justify-center text-slate-400 font-black text-xl">
+                            {emp.displayName.charAt(0)}
+                          </div>
+                        )}
+                        <div className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-white ${emp.isOnline ? 'bg-green-500' : 'bg-slate-300'}`} />
+                      </div>
+                      <p className={`text-[10px] font-black text-center truncate w-full ${historyEmployeeId === emp.uid ? 'text-blue-600' : 'text-slate-500'}`}>
+                        {emp.displayName.split(' ').pop()}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Desktop Side List */}
+                <div className="hidden lg:block flex-1 overflow-y-auto p-4 space-y-2">
                   {employees.map(emp => (
                     <button
                       key={emp.uid}
@@ -337,61 +368,57 @@ export default function AdminDashboard({ profile }: AdminDashboardProps) {
               </div>
 
               {/* History Map Content */}
-              <div className="flex-1 flex flex-col bg-slate-100 p-6 overflow-hidden">
-                <div className="bg-white flex-1 rounded-[32px] border-4 border-white shadow-2xl relative overflow-hidden">
+              <div className="flex-1 flex flex-col bg-slate-100 p-4 lg:p-6 overflow-hidden">
+                <div className="bg-white flex-1 rounded-2xl lg:rounded-[32px] border-4 border-white shadow-2xl relative overflow-hidden">
                   {historyEmployeeId ? (
                     isLoadingHistory ? (
                       <div className="absolute inset-0 z-[2000] bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center">
-                        <div className="w-12 h-12 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin mb-4" />
-                        <p className="text-sm font-bold text-slate-600">Đang tải dữ liệu đường đi...</p>
+                        <div className="w-10 h-10 lg:w-12 lg:h-12 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin mb-4" />
+                        <p className="text-xs lg:text-sm font-bold text-slate-600">Đang tải hành trình...</p>
                       </div>
                     ) : historyData.length > 0 ? (
                       <HistoryMap historyData={historyData} />
                     ) : (
-                      <div className="h-full flex flex-col items-center justify-center p-12 text-center">
-                        <div className="w-20 h-20 bg-slate-50 rounded-3xl flex items-center justify-center mb-6">
-                          <Navigation className="w-10 h-10 text-slate-200" />
+                      <div className="h-full flex flex-col items-center justify-center p-6 lg:p-12 text-center">
+                        <div className="w-16 h-16 lg:w-20 lg:h-20 bg-slate-50 rounded-2xl lg:rounded-3xl flex items-center justify-center mb-6">
+                          <Navigation className="w-8 h-8 lg:w-10 lg:h-10 text-slate-200" />
                         </div>
-                        <h3 className="text-xl font-bold text-slate-800">Không có dữ liệu</h3>
-                        <p className="text-slate-500 max-w-xs mx-auto mt-2">Nhân viên này hiện chưa có lịch sử vị trí được ghi lại trong hệ thống.</p>
+                        <h3 className="text-lg lg:text-xl font-bold text-slate-800">Không có dữ liệu</h3>
+                        <p className="text-slate-500 max-w-xs mx-auto mt-2 text-xs lg:text-sm">Nhân viên này hiện chưa có lịch sử vị trí được ghi lại trong hệ thống.</p>
                       </div>
                     )
                   ) : (
-                    <div className="h-full flex flex-col items-center justify-center p-12 text-center">
-                      <div className="w-20 h-20 bg-blue-50 rounded-3xl flex items-center justify-center mb-6">
-                        <HistoryIcon className="w-10 h-10 text-blue-200" />
+                    <div className="h-full flex flex-col items-center justify-center p-6 lg:p-12 text-center">
+                      <div className="w-16 h-16 lg:w-20 lg:h-20 bg-blue-50 rounded-2xl lg:rounded-3xl flex items-center justify-center mb-6">
+                        <HistoryIcon className="w-8 h-8 lg:w-10 lg:h-10 text-blue-200" />
                       </div>
-                      <h3 className="text-xl font-bold text-slate-800 underline decoration-blue-500 decoration-2 underline-offset-4">Bản đồ hành trình</h3>
-                      <p className="text-slate-500 max-w-xs mx-auto mt-2">Vui lòng chọn một nhân viên từ danh sách bên trái để bắt đầu theo dõi lịch sử di chuyển.</p>
+                      <h3 className="text-lg lg:text-xl font-bold text-slate-800 underline decoration-blue-500 decoration-2 underline-offset-4">Bản đồ hành trình</h3>
+                      <p className="text-slate-500 max-w-xs mx-auto mt-3 text-xs lg:text-sm font-medium">Vui lòng chọn một nhân viên để bắt đầu theo dõi lịch sử di chuyển.</p>
                     </div>
                   )}
 
-                  {/* HUD Info for history */}
+                  {/* HUD Info for history - Repositioned for Mobile */}
                   {historyData.length > 0 && !isLoadingHistory && (
-                    <div className="absolute bottom-6 left-6 z-[1000] bg-white/90 backdrop-blur rounded-2xl shadow-xl border border-white p-4 max-w-xs">
+                    <div className="absolute bottom-4 left-4 lg:bottom-6 lg:left-6 z-[1000] bg-white/95 backdrop-blur rounded-xl lg:rounded-2xl shadow-xl border border-white p-3 lg:p-4 w-[calc(100%-32px)] sm:max-w-xs">
                       <div className="flex items-center gap-2 mb-3">
-                        <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white">
-                          <Navigation className="w-4 h-4" />
+                        <div className="w-7 h-7 lg:w-8 lg:h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white">
+                          <Navigation className="w-3.5 h-3.5 lg:w-4 lg:h-4" />
                         </div>
-                        <div>
-                          <p className="text-xs font-black text-slate-900 uppercase">Hành trình</p>
-                          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+                        <div className="min-w-0">
+                          <p className="text-[10px] lg:text-xs font-black text-slate-900 uppercase">Hành trình</p>
+                          <p className="text-[9px] lg:text-[10px] text-slate-500 font-bold uppercase tracking-widest truncate">
                             {employees.find(e => e.uid === historyEmployeeId)?.displayName}
                           </p>
                         </div>
                       </div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-[11px] font-bold">
-                          <span className="text-slate-400">Điểm đầu:</span>
-                          <span className="text-slate-600">{format(new Date(historyData[0].timestamp), 'HH:mm dd/MM')}</span>
+                      <div className="grid grid-cols-2 lg:grid-cols-1 gap-2">
+                        <div className="flex justify-between items-center text-[10px] lg:text-[11px] font-bold">
+                          <span className="text-slate-400">Đầu:</span>
+                          <span className="text-slate-600 truncate ml-2">{format(new Date(historyData[0].timestamp), 'HH:mm dd/MM')}</span>
                         </div>
-                        <div className="flex justify-between text-[11px] font-bold">
-                          <span className="text-slate-400">Điểm cuối:</span>
-                          <span className="text-slate-600">{format(new Date(historyData[historyData.length - 1].timestamp), 'HH:mm dd/MM')}</span>
-                        </div>
-                        <div className="flex justify-between text-[11px] font-bold">
-                          <span className="text-slate-400">Số điểm:</span>
-                          <span className="text-blue-600">{historyData.length} tọa độ</span>
+                        <div className="flex justify-between items-center text-[10px] lg:text-[11px] font-bold">
+                          <span className="text-slate-400">Cuối:</span>
+                          <span className="text-slate-600 truncate ml-2">{format(new Date(historyData[historyData.length - 1].timestamp), 'HH:mm dd/MM')}</span>
                         </div>
                       </div>
                     </div>
@@ -401,6 +428,34 @@ export default function AdminDashboard({ profile }: AdminDashboardProps) {
             </div>
           )}
         </div>
+
+        {/* Bottom Navigation - Mobile Only */}
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-slate-200 px-4 flex items-center justify-between z-50">
+          <BottomNavLink 
+            active={activeTab === 'map'} 
+            onClick={() => setActiveTab('map')} 
+            icon={<LayoutDashboard className="w-6 h-6" />} 
+            label="Home" 
+          />
+          <BottomNavLink 
+            active={activeTab === 'staff'} 
+            onClick={() => setActiveTab('staff')} 
+            icon={<Users className="w-6 h-6" />} 
+            label="Nhân viên" 
+          />
+          <BottomNavLink 
+            active={activeTab === 'tasks'} 
+            onClick={() => setActiveTab('tasks')} 
+            icon={<ClipboardList className="w-6 h-6" />} 
+            label="Việc làm" 
+          />
+          <BottomNavLink 
+            active={activeTab === 'history'} 
+            onClick={() => setActiveTab('history')} 
+            icon={<HistoryIcon className="w-6 h-6" />} 
+            label="Lịch sử" 
+          />
+        </nav>
       </main>
 
       {/* Task Modal */}
@@ -557,18 +612,42 @@ function SidebarLink({ active, onClick, icon, label }: { active: boolean, onClic
       }`}
     >
       {icon}
-      {label}
+      <span className="truncate">{label}</span>
     </button>
   );
 }
 
-function StatCard({ label, value, status }: { label: string, value: number, status?: 'online' }) {
+function BottomNavLink({ active, onClick, icon, label }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string }) {
   return (
-    <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm">
-      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</p>
-      <div className="flex items-center gap-2">
-        {status === 'online' && <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />}
-        <p className="text-3xl font-black text-slate-900 tracking-tight">{value}</p>
+    <button 
+      onClick={onClick}
+      className={`flex flex-col items-center justify-center gap-1 flex-1 h-full transition-all ${
+        active ? 'text-blue-600' : 'text-slate-400'
+      }`}
+    >
+      <div className={`transition-transform duration-300 ${active ? 'scale-110' : 'scale-100'}`}>
+        {icon}
+      </div>
+      <span className={`text-[9px] font-black uppercase tracking-widest ${active ? 'opacity-100' : 'opacity-60'}`}>
+        {label}
+      </span>
+      {active && (
+        <motion.div 
+          layoutId="bottomNavIndicator"
+          className="absolute bottom-0 w-8 h-1 bg-blue-600 rounded-t-full shadow-[0_-2px_10px_rgba(37,99,235,0.4)]"
+        />
+      )}
+    </button>
+  );
+}
+
+function StatCard({ label, value, status, className = "" }: { label: string, value: number, status?: 'online', className?: string }) {
+  return (
+    <div className={`bg-white p-3 lg:p-5 rounded-2xl lg:rounded-3xl border border-slate-200 shadow-sm ${className}`}>
+      <p className="text-[9px] lg:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</p>
+      <div className="flex items-center gap-1.5 lg:gap-2">
+        {status === 'online' && <div className="w-1.5 h-1.5 lg:w-2 lg:h-2 rounded-full bg-green-500 animate-pulse" />}
+        <p className="text-xl lg:text-3xl font-black text-slate-900 tracking-tight">{value}</p>
       </div>
     </div>
   );
