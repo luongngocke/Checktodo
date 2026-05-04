@@ -1,6 +1,12 @@
 {
-  "name": "SEO Field Manager",
-  "description": "Hệ thống quản lý nhân viên SEO thị trường với định vị GPS và nhắc nhở công việc.",
-  "requestFramePermissions": ["geolocation"],
-  "majorCapabilities": ["Real-time Tracking", "Work Reminders"]
+  "name": "CCTV License Plate Tracker",
+  "description": "Hệ thống tự động nhận diện và báo cáo biển số xe từ camera CCTV sử dụng trí tuệ nhân tạo.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "Vision AI",
+    "Real-time Monitoring",
+    "Reporting"
+  ]
 }
